@@ -1,5 +1,7 @@
 package json
 
+// fork and modify github.com/mreiferson/go-ujson
+
 import (
 	"bytes"
 	"errors"
