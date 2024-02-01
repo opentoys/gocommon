@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/opentoys/gocommon/gcrypto/aes"
+	"github.com/opentoys/gocommon/crypto/aes"
 )
 
 func BenchmarkAES_ECB_WithoutPool(b *testing.B) {
