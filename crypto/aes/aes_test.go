@@ -7,6 +7,30 @@ import (
 	"github.com/opentoys/gocommon/crypto/aes"
 )
 
+func TestAES_ECB_WithoutPool(t *testing.T) {
+	var c = aes.New([]byte("1234567890123456")).Encrypt(new(big.Int).SetInt64(int64(124)).Bytes())
+	if c.Error != nil {
+		t.Fatal(c.Error)
+	}
+	c = aes.New([]byte("1234567890123456")).Decrypt(c.Bytes())
+	if c.Error != nil {
+		t.Fatal(c.Error)
+	}
+}
+
+func TestAES_ECB_WithPool(t *testing.T) {
+	var c = aes.NewWithPool([]byte("1234567890123456")).Encrypt(new(big.Int).SetInt64(int64(123)).Bytes())
+	if c.Error != nil {
+		t.Fatal(c.Error)
+	}
+	c.Release()
+	c = aes.NewWithPool([]byte("1234567890123456")).Decrypt(c.Bytes())
+	if c.Error != nil {
+		t.Fatal(c.Error)
+	}
+	c.Release()
+}
+
 func BenchmarkAES_ECB_WithoutPool(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var c = aes.New([]byte("1234567890123456")).Encrypt(new(big.Int).SetInt64(int64(i)).Bytes())
