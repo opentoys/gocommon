@@ -3,7 +3,7 @@ package chinese
 import (
 	"fmt"
 	"math"
-	"strconv"
+	"math/big"
 	"strings"
 )
 
@@ -15,15 +15,30 @@ var unit_map = []string{"", "拾", "佰", "仟"}
 var big_unit_map = []string{"", "万", "亿", "兆", "京", "垓", "秭", "穰", "沟", "涧", "正", "载"} // 一、十、百、千、万、亿、兆、京、垓、秭（𥝱）、穰、沟、涧、正、载
 var small_unit_map = []string{"角", "分", "厘", "毫", "丝", "忽", "微", "纤", "沙", "尘", "埃", "渺", "漠"}
 
-func DigitalPrice(n float64) string {
-	if n == 0 {
-		return zero
-	}
-	if n >= 1e46 {
+func DigitalPrice(v interface{}) string {
+	var s string
+	switch vv := v.(type) {
+	case float64:
+		s = new(big.Float).SetFloat64(vv).Text('f', 13)
+	case float32:
+		s = new(big.Float).SetFloat64(float64(vv)).Text('f', 13)
+	case string:
+		s = vv
+	case *big.Int:
+		s = vv.String()
+	case *big.Float:
+		s = vv.String()
+	case int, int8, int32, int64, uint, uint8, uint16, uint32, uint64:
+		s = fmt.Sprintf("%d", v)
+	default:
 		return maximum
 	}
-	var s = strconv.FormatFloat(n, 'f', 13, 64)
-	fmt.Println(s)
+	if s == "0" {
+		return zero
+	}
+	if len(s) > 46 {
+		return maximum
+	}
 	var srr = strings.Split(s, ".")
 	var integer, decimal, chinesei, chinesed string
 	var zerocnt int
@@ -55,7 +70,7 @@ func DigitalPrice(n float64) string {
 	}
 
 	// 价格为小数时，整数部分不显示
-	if n < 1 {
+	if length == 1 && integer < "1" {
 		chinesei = ""
 	} else {
 		chinesei += "元"
@@ -85,14 +100,30 @@ func DigitalPrice(n float64) string {
 	return chinesei + chinesed
 }
 
-func DigitalConvert(n float64) string {
-	if n == 0 {
-		return "零"
-	}
-	if n >= math.MaxFloat64 {
+func DigitalConvert(v interface{}) string {
+	var s string
+	switch vv := v.(type) {
+	case float64:
+		s = new(big.Float).SetFloat64(vv).Text('f', 13)
+	case float32:
+		s = new(big.Float).SetFloat64(float64(vv)).Text('f', 13)
+	case string:
+		s = vv
+	case *big.Int:
+		s = vv.String()
+	case *big.Float:
+		s = vv.String()
+	case int, int8, int32, int64, uint, uint8, uint16, uint32, uint64:
+		s = fmt.Sprintf("%d", v)
+	default:
 		return maximum
 	}
-	var s = strconv.FormatFloat(n, 'f', 13, 64)
+	if s == "0" {
+		return zero
+	}
+	if len(s) > 46 {
+		return maximum
+	}
 	var srr = strings.Split(s, ".")
 	var integer, decimal, chinesei, chinesed string
 	var zerocnt int
@@ -123,12 +154,12 @@ func DigitalConvert(n float64) string {
 		}
 	}
 
-	if n < 1 {
+	if length == 1 && integer < "1" {
 		chinesei = "零"
 	}
 
 	if len(decimal) == 0 {
-		return chinesei + "整"
+		return chinesei
 	}
 
 	zerocnt = 0
