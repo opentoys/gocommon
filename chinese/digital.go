@@ -49,6 +49,9 @@ func DigitalPrice(v interface{}) string {
 
 	var length = len(integer)
 	for i := 0; i < length; i++ {
+		if integer[i] > 57 || integer[i] < 48 {
+			return maximum
+		}
 		var num = integer[i] - 48
 		var unit = length - i - 1                         // 当前数字的单位
 		var quotient = int(math.Floor(float64(unit) / 4)) // 1w为进位单位, 除 4 即为 万 亿
@@ -82,6 +85,9 @@ func DigitalPrice(v interface{}) string {
 
 	zerocnt = 0
 	for i := 0; i < len(decimal); i++ {
+		if decimal[i] > 57 || decimal[i] < 48 {
+			return maximum
+		}
 		var num = decimal[i] - 48
 		if num > 0 {
 			if zerocnt > 0 {
@@ -119,7 +125,7 @@ func DigitalConvert(v interface{}) string {
 		return maximum
 	}
 	if s == "0" {
-		return zero
+		return "零"
 	}
 	if len(s) > 46 {
 		return maximum
@@ -134,6 +140,9 @@ func DigitalConvert(v interface{}) string {
 
 	var length = len(integer)
 	for i := 0; i < length; i++ {
+		if integer[i] > 57 || integer[i] < 48 {
+			return maximum
+		}
 		var num = integer[i] - 48
 		var unit = length - i - 1                         // 当前数字的单位
 		var quotient = int(math.Floor(float64(unit) / 4)) // 1w为进位单位, 除 4 即为 万 亿
@@ -164,6 +173,9 @@ func DigitalConvert(v interface{}) string {
 
 	zerocnt = 0
 	for i := 0; i < len(decimal); i++ {
+		if decimal[i] > 57 || decimal[i] < 48 {
+			return maximum
+		}
 		var num = decimal[i] - 48
 		if num > 0 {
 			if zerocnt > 0 {
