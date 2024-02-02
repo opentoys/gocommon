@@ -5,8 +5,23 @@ import "sync"
 var area = map[string]string{}
 var once sync.Once
 
+// 如果数据过时可以自行整理后传入
+func RegisterCode(data map[string]string) {
+	area = data
+}
+
+// 增补修改code
+func ConcatCode(data map[string]string) {
+	for k := range data {
+		area[k] = data[k]
+	}
+}
+
 func load() {
 	once.Do(func() {
+		if len(area) > 0 {
+			return
+		}
 		area = map[string]string{
 			"110000": "北京市",
 			"110100": "北京市",

@@ -1,5 +1,17 @@
 package holiday
 
+// 如果来不及更新也可以自己注册日期
+func RegisterDate(data map[string]Holiday) {
+	date = data
+}
+
+// 增补修改日期
+func ConcatDate(data map[string]Holiday) {
+	for k := range data {
+		date[k] = data[k]
+	}
+}
+
 // 往前暂时截至2006年
 var date = map[string]Holiday{
 	"2005-12-31": {Name: "元旦", Is: false},
