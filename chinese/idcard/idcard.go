@@ -1,7 +1,6 @@
 package idcard
 
 import (
-	_ "embed"
 	"fmt"
 	"math/rand"
 	"strconv"
