@@ -579,13 +579,22 @@ func unquoteBytes(s []byte) (t []byte, ok bool) {
 // ==========
 
 type JSON struct {
-	root interface{}
+	root  interface{}
+	Error error
 }
 
+// Stringify support map []map. not support struct, because dont use reflect.
 func Stringify(v interface{}) (buf []byte, e error) {
 	switch vv := v.(type) {
-	case map[string]interface{}, map[string]string, []map[string]interface{}, []map[string]string, []interface{}:
+	case map[string]interface{}, map[string]string,
+		[]map[string]interface{}, []map[string]string, []interface{}:
 		buf = stringify(vv)
+	case *[]map[string]interface{}:
+		buf = stringify(*vv)
+	case *[]map[string]string:
+		buf = stringify(*vv)
+	case *[]interface{}:
+		buf = stringify(*vv)
 	default:
 		return nil, errors.New("not support types")
 	}
@@ -659,19 +668,34 @@ func stringify(v interface{}) []byte {
 	return buf.Bytes()
 }
 
-func Parse(data []byte) (*JSON, error) {
+func Parse(data []byte) (v interface{}, e error) {
 	if len(data) < 2 { // Need at least "{}"
 		return nil, errors.New("no data passed in")
 	}
 
-	j := &JSON{}
-	dec := NewDecoder(simpleStore{}, data)
-	root, err := dec.Decode()
-	if err != nil {
-		return nil, err
+	v, e = NewDecoder(simpleStore{}, data).Decode()
+	return
+}
+
+type cfg struct {
+	store ObjectStore
+}
+type Option func(*cfg)
+
+func WithStore(store ObjectStore) Option {
+	return func(c *cfg) {
+		c.store = store
 	}
-	j.root = root
-	return j, nil
+}
+
+func New(data []byte, opts ...Option) (j *JSON) {
+	j = &JSON{}
+	var cfg = &cfg{simpleStore{}}
+	for k := range opts {
+		opts[k](cfg)
+	}
+	j.root, j.Error = NewDecoder(cfg.store, data).Decode()
+	return
 }
 
 func (j *JSON) Interface() interface{} {
@@ -685,13 +709,16 @@ func (j *JSON) Interface() interface{} {
 //
 //	js.Get("top_level").Get("dict").Get("value").Int()
 func (j *JSON) Get(key string) *JSON {
+	if j.Error != nil {
+		return j
+	}
 	m, err := j.MaybeMap()
 	if err == nil {
 		if val, ok := m[key]; ok {
-			return &JSON{val}
+			return &JSON{root: val}
 		}
 	}
-	return &JSON{nil}
+	return &JSON{root: nil}
 }
 
 // Map guarantees the return of a `map[string]interface{}` (with optional default)
@@ -702,6 +729,9 @@ func (j *JSON) Get(key string) *JSON {
 //		fmt.Println(k, v)
 //	}
 func (j *JSON) Map(args ...map[string]interface{}) map[string]interface{} {
+	if j.Error != nil {
+		return nil
+	}
 	var def map[string]interface{}
 
 	switch len(args) {
@@ -722,6 +752,9 @@ func (j *JSON) Map(args ...map[string]interface{}) map[string]interface{} {
 
 // MaybeMap type asserts to `map`
 func (j *JSON) MaybeMap() (map[string]interface{}, error) {
+	if j.Error != nil {
+		return nil, j.Error
+	}
 	if j == nil {
 		return nil, errors.New("cannot MaybeMap on a nil pointer")
 	}
@@ -737,6 +770,9 @@ func (j *JSON) MaybeMap() (map[string]interface{}, error) {
 //
 //	myFunc(js.Get("param1").String(), js.Get("optional_param").String("my_default"))
 func (j *JSON) String(args ...string) string {
+	if j.Error != nil {
+		return ""
+	}
 	var def string
 
 	switch len(args) {
@@ -757,6 +793,9 @@ func (j *JSON) String(args ...string) string {
 
 // MaybeString type asserts to `string`
 func (j *JSON) MaybeString() (string, error) {
+	if j.Error != nil {
+		return "", j.Error
+	}
 	if s, ok := (j.root).(string); ok {
 		return s, nil
 	}
@@ -769,6 +808,9 @@ func (j *JSON) MaybeString() (string, error) {
 //
 //	myFunc(js.Get("param1").Float64(), js.Get("optional_param").Float64(51.15))
 func (j *JSON) Float64(args ...float64) float64 {
+	if j.Error != nil {
+		return 0
+	}
 	var def float64
 
 	switch len(args) {
@@ -789,6 +831,9 @@ func (j *JSON) Float64(args ...float64) float64 {
 
 // MaybeFloat64 type asserts and parses an `float64`
 func (j *JSON) MaybeFloat64() (float64, error) {
+	if j.Error != nil {
+		return 0, j.Error
+	}
 	if n, ok := (j.root).(float64); ok {
 		return n, nil
 	}
@@ -801,6 +846,9 @@ func (j *JSON) MaybeFloat64() (float64, error) {
 //
 //	myFunc(js.Get("param1").Bool(), js.Get("optional_param").Bool(true))
 func (j *JSON) Bool(args ...bool) bool {
+	if j.Error != nil {
+		return false
+	}
 	var def bool
 
 	switch len(args) {
@@ -821,6 +869,9 @@ func (j *JSON) Bool(args ...bool) bool {
 
 // MaybeBool type asserts and parses an `bool`
 func (j *JSON) MaybeBool() (bool, error) {
+	if j.Error != nil {
+		return false, j.Error
+	}
 	if b, ok := (j.root).(bool); ok {
 		return b, nil
 	}
@@ -833,13 +884,16 @@ func (j *JSON) MaybeBool() (bool, error) {
 //
 //	myFunc(js.Get("param1").Array(), js.Get("optional_param").Array([]interface{}{"string", 1, 1.1, false}))
 func (j *JSON) Array(args ...[]interface{}) []*JSON {
+	if j.Error != nil {
+		return nil
+	}
 	var def []*JSON
 
 	switch len(args) {
 	case 0:
 	case 1:
 		for _, val := range args[0] {
-			def = append(def, &JSON{val})
+			def = append(def, &JSON{root: val})
 		}
 	default:
 		log.Panicf("Array() received too many arguments %d", len(args))
@@ -855,10 +909,13 @@ func (j *JSON) Array(args ...[]interface{}) []*JSON {
 
 // MaybeArray type asserts to `*[]interface{}`
 func (j *JSON) MaybeArray() ([]*JSON, error) {
+	if j.Error != nil {
+		return nil, j.Error
+	}
 	var ret []*JSON
 	if a, ok := (j.root).(*[]interface{}); ok {
 		for _, val := range *a {
-			ret = append(ret, &JSON{val})
+			ret = append(ret, &JSON{root: val})
 		}
 		return ret, nil
 	}
