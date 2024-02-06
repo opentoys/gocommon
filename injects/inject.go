@@ -71,7 +71,7 @@ func Populate(values ...interface{}) error {
 
 // An Object in the Graph.
 type Object struct {
-	Value        any
+	Value        interface{}
 	Name         string             // Optional
 	Complete     bool               // If true, the Value will be considered complete
 	Fields       map[string]*Object // Populated with the field names that were injected and their corresponding *Object.
@@ -269,7 +269,7 @@ StructLoop:
 			)
 		}
 
-		// Inline tag on anything besides a struct is considered invalid.
+		// Inline tag on interface{}thing besides a struct is considered invalid.
 		if tag.Inline && fieldType.Kind() != reflect.Struct {
 			return fmt.Errorf(
 				"inline requested on non inlined field %s in type %s",
