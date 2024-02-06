@@ -41,7 +41,7 @@ func (s *global) SetDebug(t bool) {
 	s.g.debug = true
 }
 
-func (s *global) Register(v any, cfgs ...*Config) {
+func (s *global) Register(v interface{}, cfgs ...*Config) {
 	s.wg.Lock()
 	defer s.wg.Unlock()
 	if len(cfgs) == 0 {
@@ -93,7 +93,7 @@ func (s *global) Action() (e error) {
 	return
 }
 
-func (s *global) FindObjects(prefix string) (lst []any) {
+func (s *global) FindObjects(prefix string) (lst []interface{}) {
 	s.wg.RLock()
 	defer s.wg.RUnlock()
 	for idx := range s.data {
@@ -106,7 +106,7 @@ func (s *global) FindObjects(prefix string) (lst []any) {
 
 type log struct{}
 
-func (log) Debugf(format string, v ...any) {
+func (log) Debugf(format string, v ...interface{}) {
 	format += "\n"
 	fmt.Printf(format, v...)
 }
