@@ -34,11 +34,11 @@ type global struct {
 }
 
 func (s *global) SetFullpath(t bool) {
-	s.g.fullpath = true
+	s.g.fullpath = t
 }
 
 func (s *global) SetDebug(t bool) {
-	s.g.debug = true
+	s.g.debug = t
 }
 
 func (s *global) Register(v interface{}, cfgs ...*Config) {
@@ -72,12 +72,12 @@ func (s *global) Action() (e error) {
 		return s.data[i].S < s.data[j].S
 	})
 	var arr []string
-	var by Step = 255
+	var by int16 = -1
 	for idx := range s.data {
-		if by != s.data[idx].S {
+		if s := int16(s.data[idx].S); by != s {
 			sb.WriteString(fmt.Sprintf("    [step %d]: %v\n", by, arr))
 			arr = []string{}
-			by = s.data[idx].S
+			by = s
 		}
 		arr = append(arr, s.data[idx].o.String())
 		if v, ok := s.data[idx].o.Value.(interface{ Register() (e error) }); ok {

@@ -163,7 +163,7 @@ func (g *Graph) Provide(objects ...*Object) error {
 			g.named[o.Name] = o
 		}
 
-		if g.logger != nil {
+		if g.logger != nil && g.debug {
 			if o.created {
 				g.logger.Debugf("created %s", o)
 			} else if o.embedded {
@@ -307,7 +307,7 @@ StructLoop:
 			}
 
 			field.Set(reflect.ValueOf(existing.Value))
-			if g.logger != nil {
+			if g.logger != nil && g.debug {
 				g.logger.Debugf(
 					"assigned %s to field %s in %s",
 					existing,
@@ -365,7 +365,7 @@ StructLoop:
 			}
 
 			field.Set(reflect.MakeMap(fieldType))
-			if g.logger != nil {
+			if g.logger != nil && g.debug {
 				g.logger.Debugf(
 					"made map for field %s in %s",
 					o.reflectType.Elem().Field(i).Name,
@@ -393,7 +393,7 @@ StructLoop:
 				}
 				if existing.reflectType.AssignableTo(fieldType) {
 					field.Set(reflect.ValueOf(existing.Value))
-					if g.logger != nil {
+					if g.logger != nil && g.debug {
 						g.logger.Debugf(
 							"assigned existing %s to field %s in %s",
 							existing,
@@ -422,7 +422,7 @@ StructLoop:
 
 		// Finally assign the newly created object to our field.
 		field.Set(newValue)
-		if g.logger != nil {
+		if g.logger != nil && g.debug {
 			g.logger.Debugf(
 				"assigned newly created %s to field %s in %s",
 				newObject,
@@ -508,7 +508,7 @@ func (g *Graph) populateUnnamedInterface(o *Object) error {
 				}
 				found = existing
 				field.Set(reflect.ValueOf(existing.Value))
-				if g.logger != nil {
+				if g.logger != nil && g.debug {
 					g.logger.Debugf(
 						"assigned existing %s to interface field %s in %s",
 						existing,
