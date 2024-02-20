@@ -12,7 +12,7 @@ type Config struct {
 	Step Step   // step 越小，执行越靠前
 }
 
-type Step uint8
+type Step int8
 
 var Service = NewInjects()
 
@@ -72,9 +72,9 @@ func (s *global) Action() (e error) {
 		return s.data[i].S < s.data[j].S
 	})
 	var arr []string
-	var by int16 = -1
+	var by int8 = -1
 	for idx := range s.data {
-		if s := int16(s.data[idx].S); by != s {
+		if s := int8(s.data[idx].S); by != s {
 			sb.WriteString(fmt.Sprintf("    [step %d]: %v\n", by, arr))
 			arr = []string{}
 			by = s
