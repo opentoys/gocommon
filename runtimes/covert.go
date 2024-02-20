@@ -1,6 +1,9 @@
 package runtimes
 
-import "unsafe"
+import (
+	"encoding/json"
+	"unsafe"
+)
 
 // String2Bytes will unsafe
 func String2Bytes(s string) []byte {
@@ -12,4 +15,9 @@ func String2Bytes(s string) []byte {
 // Bytes2String will unsafe
 func Bytes2String(buf []byte) string {
 	return *(*string)(unsafe.Pointer(&buf))
+}
+
+func Strnigify(v interface{}) string {
+	s, _ := json.Marshal(v)
+	return Bytes2String(s)
 }
