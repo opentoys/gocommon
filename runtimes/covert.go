@@ -17,7 +17,7 @@ func Bytes2String(buf []byte) string {
 	return *(*string)(unsafe.Pointer(&buf))
 }
 
-func Strnigify(v interface{}) string {
+func Stringify(v interface{}) string {
 	s, _ := json.Marshal(v)
 	return Bytes2String(s)
 }
