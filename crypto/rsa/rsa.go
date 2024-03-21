@@ -11,23 +11,14 @@ import (
 	"io"
 	"math/big"
 	"strings"
-	"sync"
 )
-
-var rsapool = &sync.Pool{
-	New: func() interface{} {
-		return new(Cipher)
-	},
-}
 
 // Encrypt RSA
 //
 // default Padding Pkcs1
 // support none padding (unsafe)
 func Encrypt(pub *rsa.PublicKey, msg []byte, opts ...Option) ([]byte, error) {
-	var c = NewWithPool(pub, nil, opts...)
-	defer c.Release()
-	c = c.Encrypt(msg)
+	var c = New(pub, nil, opts...).Encrypt(msg)
 	return c.dst, c.Error
 }
 
@@ -36,9 +27,7 @@ func Encrypt(pub *rsa.PublicKey, msg []byte, opts ...Option) ([]byte, error) {
 // default Padding Pkcs1
 // support none padding (unsafe)
 func Decrypt(priv *rsa.PrivateKey, msg []byte, opts ...Option) ([]byte, error) {
-	var c = NewWithPool(nil, priv, opts...)
-	defer c.Release()
-	c = c.Decrypt(msg)
+	var c = New(nil, priv, opts...).Decrypt(msg)
 	return c.dst, c.Error
 }
 
@@ -158,31 +147,6 @@ func New(pub *rsa.PublicKey, priv *rsa.PrivateKey, opts ...Option) *Cipher {
 		opts[i](c.option)
 	}
 	return &c
-}
-
-// NewWithPool new from rsapool
-//
-//	NewWithPool(pub,priv).String(gcrypto.Base64) => base64 string
-//	NewWithPool(pub,priv).Encrypt().String(gcrypto.Raw) => utf8 string
-//	NewWithPool(pub,priv).Decrypt().Bytes() => []byte
-//	NewWithPool(pub,priv).Release() => free Cipher to global rsapool
-//
-// support none padding (unsafe)
-func NewWithPool(pub *rsa.PublicKey, priv *rsa.PrivateKey, opts ...Option) *Cipher {
-	var c = rsapool.Get().(*Cipher)
-	c.pub = pub
-	c.priv = priv
-	c.option = &option{}
-	for i := range opts {
-		opts[i](c.option)
-	}
-	c.dst = c.dst[:0]
-	c.Error = nil
-	return c
-}
-
-func (s *Cipher) Release() {
-	rsapool.Put(s)
 }
 
 func (s *Cipher) Bytes() []byte {

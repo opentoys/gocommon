@@ -5,14 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"errors"
-	"sync"
 )
-
-var aespool = &sync.Pool{
-	New: func() interface{} {
-		return new(Cipher)
-	},
-}
 
 // Encrypt AES
 //
@@ -26,9 +19,7 @@ var aespool = &sync.Pool{
 //
 // withiv default: mode = CBC/Pkcs7padding
 func Encrypt(msg, key []byte, opts ...Option) ([]byte, error) {
-	var c = NewWithPool(key, opts...)
-	defer c.Release()
-	c = c.Encrypt(msg)
+	var c = New(key).Encrypt(msg)
 	return c.dst, c.Error
 }
 
@@ -44,9 +35,7 @@ func Encrypt(msg, key []byte, opts ...Option) ([]byte, error) {
 //
 // withiv default: mode = CBC/Pkcs7padding
 func Decrypt(msg, key []byte, opts ...Option) ([]byte, error) {
-	var c = NewWithPool(key, opts...)
-	defer c.Release()
-	c = c.Decrypt(msg)
+	var c = New(key, opts...).Decrypt(msg)
 	return c.dst, c.Error
 }
 
@@ -136,42 +125,6 @@ func New(key []byte, opts ...Option) *Cipher {
 		c.option.mode = ECB
 	}
 	return &c
-}
-
-// NewWithPool New with aespool
-//
-// support 128/192/256bit Mapping key length 16byte/24byte/32byte
-//
-// support ECB/CBC/CTR/OFB/CFB mode
-//
-// support	Pkcs7/Pkcs5/Iso97971/AnsiX923/Zero/Empty/No padding
-//
-// without iv default: mode = ECB/Pkcs7padding
-//
-// withiv default: mode = CBC/Pkcs7padding
-//
-//	NewWithPool([]byte("1234567890123456")).Encrypt(msg).String(gcrypto.Base64)
-//	NewWithPool([]byte("1234567890123456")).Decrypt(msg).String(gcrypto.Raw)
-//	NewWithPool([]byte("1234567890123456")).Decrypt(msg).Bytes()
-//	NewWithPool([]byte("1234567890123456")).Decrypt(msg).Error
-//	NewWithPool([]byte("1234567890123456")).Release() // free Cipher global aespool
-func NewWithPool(key []byte, opts ...Option) *Cipher {
-	var c = aespool.Get().(*Cipher)
-	c.key = key
-	c.option = &opt{}
-	for i := range opts {
-		opts[i](c.option)
-	}
-	if len(c.option.iv) == 0 {
-		c.option.mode = ECB
-	}
-	c.dst = c.dst[:0]
-	c.Error = nil
-	return c
-}
-
-func (s *Cipher) Release() {
-	aespool.Put(s)
 }
 
 func (s *Cipher) Bytes() []byte {
