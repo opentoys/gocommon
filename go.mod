@@ -1,3 +1,3 @@
 module github.com/opentoys/gocommon
 
-go 1.8.0
+go 1.18.0
