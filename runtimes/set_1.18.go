@@ -5,12 +5,12 @@ package runtimes
 
 type Set[T comparable] map[T]struct{}
 
-func NewSet[T comparable](a ...T) Set[T] {
+func NewSet[T comparable](a ...T) *Set[T] {
 	s := make(Set[T], len(a))
 	for i := range a {
 		s.Set(a[i])
 	}
-	return s
+	return &s
 }
 
 func (s *Set[T]) Set(k T) {

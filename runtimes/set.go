@@ -5,12 +5,12 @@ package runtimes
 
 type Set map[interface{}]struct{}
 
-func NewSet(a ...interface{}) Set {
+func NewSet(a ...interface{}) *Set {
 	s := make(Set, len(a))
 	for i := range a {
 		s.Set(a[i])
 	}
-	return s
+	return &s
 }
 
 func (s *Set) Set(k interface{}) {
