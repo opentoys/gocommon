@@ -19,7 +19,7 @@ import (
 //
 // withiv default: mode = CBC/Pkcs7padding
 func Encrypt(msg, key []byte, opts ...Option) ([]byte, error) {
-	var c = New(key).Encrypt(msg)
+	var c = New(key, opts...).Encrypt(msg)
 	return c.dst, c.Error
 }
 
