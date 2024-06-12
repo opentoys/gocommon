@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/base64"
 	"errors"
 )
 
@@ -64,37 +65,52 @@ const (
 	No
 )
 
-type opt struct {
-	iv      []byte
-	mode    Mode
-	padding Padding
-}
-
-type Option func(*opt)
+type Option func(*Cipher)
 
 func WithIV(iv []byte) Option {
-	return func(o *opt) {
+	return func(o *Cipher) {
 		o.iv = iv
 	}
 }
 
 func WithMode(mode Mode) Option {
-	return func(o *opt) {
+	return func(o *Cipher) {
 		o.mode = mode
 	}
 }
 
 func WithPadding(padding Padding) Option {
-	return func(o *opt) {
+	return func(o *Cipher) {
 		o.padding = padding
 	}
 }
 
+// 用于加密时返回密文编码格式
+// Used to return ciphertext encoding format when encrypting
+func WithEncode(enc func([]byte) string) Option {
+	return func(o *Cipher) {
+		o.encode = enc
+	}
+}
+
+// 用于解密时解密字符串类型解码
+// Used for decryption string type decoding when decrypting
+func WithDecode(dec func(string) ([]byte, error)) Option {
+	return func(o *Cipher) {
+		o.decode = dec
+	}
+}
+
 type Cipher struct {
-	key    []byte
-	option *opt
-	dst    []byte
-	Error  error
+	key   []byte
+	dst   []byte
+	Error error
+
+	iv      []byte
+	mode    Mode
+	padding Padding
+	encode  func([]byte) string
+	decode  func(string) ([]byte, error)
 }
 
 // New AES
@@ -113,26 +129,27 @@ type Cipher struct {
 //	New([]byte("1234567890123456")).Decrypt(msg).String(gcrypto.Raw)
 //	New([]byte("1234567890123456")).Decrypt(msg).Bytes()
 //	New([]byte("1234567890123456")).Decrypt(msg).Error
-//	New([]byte("1234567890123456")).Release() // free Cipher global aespool
 func New(key []byte, opts ...Option) *Cipher {
-	var c Cipher
-	c.key = key
-	c.option = &opt{}
+	var c = &Cipher{
+		key:    key,
+		encode: base64.StdEncoding.EncodeToString,
+		decode: base64.StdEncoding.DecodeString,
+	}
 	for i := range opts {
-		opts[i](c.option)
+		opts[i](c)
 	}
-	if len(c.option.iv) == 0 {
-		c.option.mode = ECB
+	if len(c.iv) == 0 {
+		c.mode = ECB
 	}
-	return &c
+	return c
 }
 
 func (s *Cipher) Bytes() []byte {
 	return s.dst
 }
 
-func (s *Cipher) String(enc func([]byte) string) (ss string) {
-	return enc(s.dst)
+func (s *Cipher) String() (ss string) {
+	return s.encode(s.dst)
 }
 
 func (s *Cipher) emptyPadding(src []byte, blockSize int) (buf []byte) {
@@ -203,42 +220,42 @@ func (s *Cipher) pkcs5UnPadding(src []byte, blockSize int) (buf []byte) {
 // NewCBCEncrypter encrypts with CBC mode.
 func (s *Cipher) newCBCEncrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewCBCEncrypter(block, s.option.iv).CryptBlocks(dst, src)
+	cipher.NewCBCEncrypter(block, s.iv).CryptBlocks(dst, src)
 	return
 }
 
 // NewCBCDecrypter decrypts with CBC mode.
 func (s *Cipher) newCBCDecrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewCBCDecrypter(block, s.option.iv).CryptBlocks(dst, src)
+	cipher.NewCBCDecrypter(block, s.iv).CryptBlocks(dst, src)
 	return
 }
 
 // NewCFBEncrypter encrypts with CFB mode.
 func (s *Cipher) newCFBEncrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewCFBEncrypter(block, s.option.iv).XORKeyStream(dst, src)
+	cipher.NewCFBEncrypter(block, s.iv).XORKeyStream(dst, src)
 	return
 }
 
 // NewCFBDecrypter decrypts with CFB mode.
 func (s *Cipher) newCFBDecrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewCFBDecrypter(block, s.option.iv).XORKeyStream(dst, src)
+	cipher.NewCFBDecrypter(block, s.iv).XORKeyStream(dst, src)
 	return
 }
 
 // NewCTREncrypter encrypts with CTR mode.
 func (s *Cipher) newCTREncrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewCTR(block, s.option.iv).XORKeyStream(dst, src)
+	cipher.NewCTR(block, s.iv).XORKeyStream(dst, src)
 	return
 }
 
 // NewCTRDecrypter decrypts with CTR mode.
 func (s *Cipher) newCTRDecrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewCTR(block, s.option.iv).XORKeyStream(dst, src)
+	cipher.NewCTR(block, s.iv).XORKeyStream(dst, src)
 	return
 }
 
@@ -269,15 +286,24 @@ func (s *Cipher) newECBDecrypter(src []byte, block cipher.Block) (dst []byte) {
 // NewOFBEncrypter encrypts with OFB mode.
 func (s *Cipher) newOFBEncrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewOFB(block, s.option.iv[:block.BlockSize()]).XORKeyStream(dst, src)
+	cipher.NewOFB(block, s.iv[:block.BlockSize()]).XORKeyStream(dst, src)
 	return
 }
 
 // NewOFBDecrypter decrypts with OFB mode.
 func (s *Cipher) newOFBDecrypter(src []byte, block cipher.Block) (dst []byte) {
 	dst = make([]byte, len(src))
-	cipher.NewOFB(block, s.option.iv[:block.BlockSize()]).XORKeyStream(dst, src)
+	cipher.NewOFB(block, s.iv[:block.BlockSize()]).XORKeyStream(dst, src)
 	return
+}
+
+func (s *Cipher) DecryptString(src string) *Cipher {
+	buf, e := s.decode(src)
+	if e != nil {
+		s.Error = e
+		return s
+	}
+	return s.Decrypt(buf)
 }
 
 // Encrypt encrypts with given mode and padding
@@ -293,7 +319,7 @@ func (s *Cipher) Encrypt(src []byte) *Cipher {
 		return s
 	}
 
-	switch s.option.padding {
+	switch s.padding {
 	case No:
 		if len(src)%size != 0 {
 			s.Error = errors.New("aes: invalid src, the src is not full blocks")
@@ -313,7 +339,7 @@ func (s *Cipher) Encrypt(src []byte) *Cipher {
 		src = s.zeroPadding(src, size)
 	}
 
-	switch s.option.mode {
+	switch s.mode {
 	case ECB:
 		s.dst = s.newECBEncrypter(src, block)
 	case CTR:
@@ -341,7 +367,7 @@ func (s *Cipher) Decrypt(src []byte) *Cipher {
 		return s
 	}
 
-	switch s.option.mode {
+	switch s.mode {
 	case ECB:
 		src = s.newECBDecrypter(src, block)
 	case CTR:
@@ -354,7 +380,7 @@ func (s *Cipher) Decrypt(src []byte) *Cipher {
 		src = s.newCBCDecrypter(src, block)
 	}
 
-	switch s.option.padding {
+	switch s.padding {
 	case No:
 		if len(src)%size != 0 {
 			s.Error = errors.New("aes: invalid src, the src is not full blocks")
