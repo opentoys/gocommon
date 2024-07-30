@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"time"
 )
 
@@ -150,13 +149,8 @@ func UsePayload() Handle {
 		var r = GetRequest(ctx)
 		_ = FormEncoded(r.URL.Query(), body, "qs")
 		_ = FormEncoded(r.Header, body, "header")
-		var ctyp = r.Header.Get("Content-Type")
-		for k, v := range Decode {
-			if strings.Contains(ctyp, k) {
-				e = v(buf, body)
-				return
-			}
-		}
+		var ctyp = r.Header.Get(headerContentType)
+		e = decode(ctyp)(buf, body)
 		return
 	}
 }

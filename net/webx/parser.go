@@ -3,9 +3,21 @@ package webx
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
+)
+
+const (
+	headerContentType = "Content-Type"
+)
+
+const (
+	type_xml        = "xml"
+	type_json       = "json"
+	type_urlencoded = "urlencoded"
 )
 
 func parseMapArray(data map[string][]string, v any, tag string) {
@@ -53,23 +65,51 @@ func UnmarshalFormUrlencoded(buf []byte, v any) (e error) {
 	return
 }
 
-var Decode = map[string]func([]byte, any) error{
-	"text/xml":                          xml.Unmarshal,
-	"application/xml":                   xml.Unmarshal,
-	"text/xhtml":                        xml.Unmarshal,
-	"application/json":                  json.Unmarshal,
-	"application/x-www-form-urlencoded": UnmarshalFormUrlencoded,
-	"text/x-www-form-urlencoded":        UnmarshalFormUrlencoded,
-}
-
-var Encode = map[string]func(any) ([]byte, error){
-	"text/xml":         xml.Marshal,
-	"application/xml":  xml.Marshal,
-	"text/xhtml":       xml.Marshal,
-	"application/json": json.Marshal,
-}
-
 var FormEncoded = func(data map[string][]string, out any, tag string) (e error) {
 	parseMapArray(data, out, tag)
 	return
+}
+
+var decodes = map[string]func([]byte, any) error{
+	type_xml:        xml.Unmarshal,
+	type_json:       json.Unmarshal,
+	type_urlencoded: UnmarshalFormUrlencoded,
+	"":              func(b []byte, a any) (e error) { return },
+}
+
+var encodes = map[string]func(any) ([]byte, error){
+	type_xml:  xml.Marshal,
+	type_json: json.Marshal,
+	"":        func(v any) ([]byte, error) { return []byte(fmt.Sprintf("%#v", v)), nil },
+}
+
+func RegisterDecode(typ string, fn func([]byte, any) error) {
+	decodes[typ] = fn
+}
+
+func RegisterEncode(typ string, fn func(any) ([]byte, error)) {
+	encodes[typ] = fn
+}
+
+func encode(header string) func(v any) ([]byte, error) {
+	if strings.Contains(header, type_json) {
+		return encodes[type_json]
+	}
+	if strings.Contains(header, type_xml) {
+		return encodes[type_xml]
+	}
+	return encodes[""]
+}
+
+func decode(header string) func([]byte, any) error {
+	if strings.Contains(header, type_json) {
+		return decodes[type_json]
+	}
+	if strings.Contains(header, type_xml) {
+		return decodes[type_xml]
+	}
+	if strings.Contains(header, type_urlencoded) {
+		return decodes[type_urlencoded]
+	}
+	return decodes[""]
 }

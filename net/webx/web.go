@@ -2,7 +2,6 @@ package webx
 
 import (
 	"context"
-	"net/http"
 )
 
 const StatusUnavailable = 499 // 自定义状态码
@@ -12,7 +11,6 @@ type H = map[string]any
 type Handle func(context.Context) (e error)
 
 type Route interface {
-	http.Handler
 	Use(fn ...Handle)
 	Group(uri string, fn ...Handle) Route
 	Any(method, uri string, handle ...any)
@@ -26,11 +24,27 @@ type Route interface {
 }
 
 type WebApp struct {
-	Route
+	*Trie
 }
 
-func New(ops ...OptionStdRouter) *WebApp {
+func New() *WebApp {
 	var s WebApp
-	s.Route = newStdRouter(ops...)
+	s.Trie = newTrie()
 	return &s
+}
+
+// 自定义成功响应类型
+// 处理中可以调用 webx.Abort(ctx) 终止后续操作，自行处理响应
+func (s *WebApp) SetCustomeSend(fn func(context.Context, any, error) H) {
+	s.Trie.custom = fn
+}
+
+// 设置处理捕获的 panic 如何处理
+func (s *WebApp) SetRecover(fn func(context.Context, any) error) {
+	s.Trie.recover = fn
+}
+
+// 设置默认响应类型 默认application/json
+func (s *WebApp) SetDefaultContentType(typ string) {
+	s.Trie.defaultContentType = typ
 }

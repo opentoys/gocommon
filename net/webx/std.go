@@ -9,49 +9,14 @@ import (
 	"reflect"
 )
 
-type OptionStdRouter func(*StdRouter)
-
-// 自定义成功响应类型
-// 处理中可以调用 webx.Abort(ctx) 终止后续操作，自行处理响应
-func WithStdRouterCustomeSend(fn func(context.Context, any, error) H) OptionStdRouter {
-	return func(sr *StdRouter) {
-		sr.customsend = fn
-	}
-}
-
-// 设置处理捕获的 panic 如何处理
-func WithStdRouterRecover(fn func(context.Context, any) error) OptionStdRouter {
-	return func(sr *StdRouter) {
-		sr.recover = fn
-	}
-}
-
-// 设置路由注册处理，可以自行生产文档
-func WithStdRouterPrintRoute(fn func(method, uri string, fn reflect.Value)) OptionStdRouter {
-	return func(sr *StdRouter) {
-		sr.printroute = fn
-	}
-}
-
-// 设置默认响应类型 默认application/json
-func WithStdRouterDefaultContentType(typ string) OptionStdRouter {
-	return func(sr *StdRouter) {
-		sr.defaultContentType = typ
-	}
-}
-
-func newStdRouter(ops ...OptionStdRouter) *StdRouter {
-	s := &StdRouter{
+func newRouter() *Router {
+	return &Router{
 		mux:                http.NewServeMux(),
 		defaultContentType: "application/json",
 	}
-	for _, v := range ops {
-		v(s)
-	}
-	return s
 }
 
-type StdRouter struct {
+type Router struct {
 	prefix             string
 	defaultContentType string
 	mux                *http.ServeMux
@@ -61,7 +26,7 @@ type StdRouter struct {
 	handles            []Handle
 }
 
-func (s *StdRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var ctx = r.Context()
 	var st = &store{w: w}
 	ctx = context.WithValue(ctx, ctxstore{}, st)
@@ -69,38 +34,30 @@ func (s *StdRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(st.w, st.r)
 }
 
-func (s *StdRouter) Use(fn ...Handle) {
+func (s *Router) Use(fn ...Handle) {
 	s.handles = append(s.handles, fn...)
 }
 
-func (s *StdRouter) clone() *StdRouter {
-	var app = &StdRouter{
-		prefix:             s.prefix,
-		defaultContentType: s.defaultContentType,
-		mux:                http.NewServeMux(),
-		customsend:         s.customsend,
-		recover:            s.recover,
-		printroute:         s.printroute,
-		handles:            []Handle{},
-	}
-	return app
-}
-
-func (s *StdRouter) Group(uri string, fn ...Handle) Route {
-	var app = s.clone()
-	app.prefix = path.Join(app.prefix, uri)
+func (s *Router) Group(uri string, fn ...Handle) Route {
+	var app Router
+	app.prefix = path.Join(s.prefix, uri)
 	app.handles = append(app.handles, s.handles...)
 	app.handles = append(app.handles, fn...)
+	app.customsend = s.customsend
+	app.recover = s.recover
+	app.printroute = s.printroute
+	app.defaultContentType = s.defaultContentType
+	app.mux = http.NewServeMux()
 	last := uri[len(uri)-1]
 	if last == '/' {
-		s.mux.Handle(uri, http.StripPrefix(uri[:len(uri)-1], app))
+		s.mux.Handle(uri, http.StripPrefix(uri[:len(uri)-1], &app))
 	} else {
-		s.mux.Handle(uri+"/", http.StripPrefix(uri, app))
+		s.mux.Handle(uri+"/", http.StripPrefix(uri, &app))
 	}
-	return app
+	return &app
 }
 
-func (s *StdRouter) Any(method, uri string, handle ...any) {
+func (s *Router) Any(method, uri string, handle ...any) {
 	var length = len(handle)
 	var hs = make([]Handle, 0, length)
 	var action = reflect.ValueOf(handle[length-1])
@@ -199,7 +156,7 @@ func (s *StdRouter) Any(method, uri string, handle ...any) {
 	})
 }
 
-func (s *StdRouter) rangeuse(ctx context.Context, hs []Handle) (e error) {
+func (s *Router) rangeuse(ctx context.Context, hs []Handle) (e error) {
 	store := getStore(ctx)
 	for _, fn := range hs {
 		if store.abort {
@@ -216,16 +173,13 @@ func (s *StdRouter) rangeuse(ctx context.Context, hs []Handle) (e error) {
 	return
 }
 
-func (s *StdRouter) send(ctx context.Context, code int, v any) {
+func (s *Router) send(ctx context.Context, code int, v any) {
 	var store = getStore(ctx)
 	if store.abort {
 		return
 	}
 
-	encode := Encode[store.w.Header().Get("Content-Type")]
-	if encode == nil {
-		encode = Encode[s.defaultContentType]
-	}
+	encode := encode(store.w.Header().Get(headerContentType))
 	switch vv := v.(type) {
 	case H:
 		s.writerhead(store.w, code, s.defaultContentType)
@@ -256,39 +210,39 @@ func (s *StdRouter) send(ctx context.Context, code int, v any) {
 	}
 }
 
-func (s *StdRouter) writerhead(w http.ResponseWriter, code int, ctyp string) {
-	if w.Header().Get("Content-Type") == "" {
-		w.Header().Set("Content-Type", ctyp)
+func (s *Router) writerhead(w http.ResponseWriter, code int, ctyp string) {
+	if w.Header().Get(headerContentType) == "" {
+		w.Header().Set(headerContentType, ctyp)
 	}
 	if code > 0 {
 		w.WriteHeader(code)
 	}
 }
 
-func (s *StdRouter) GET(uri string, handle ...any) {
+func (s *Router) GET(uri string, handle ...any) {
 	s.Any(http.MethodGet, uri, handle...)
 }
 
-func (s *StdRouter) POST(uri string, handle ...any) {
+func (s *Router) POST(uri string, handle ...any) {
 	s.Any(http.MethodPost, uri, handle...)
 }
 
-func (s *StdRouter) PUT(uri string, handle ...any) {
+func (s *Router) PUT(uri string, handle ...any) {
 	s.Any(http.MethodPut, uri, handle...)
 }
 
-func (s *StdRouter) PATCH(uri string, handle ...any) {
+func (s *Router) PATCH(uri string, handle ...any) {
 	s.Any(http.MethodPatch, uri, handle...)
 }
 
-func (s *StdRouter) DELETE(uri string, handle ...any) {
+func (s *Router) DELETE(uri string, handle ...any) {
 	s.Any(http.MethodDelete, uri, handle...)
 }
 
-func (s *StdRouter) OPTIONS(uri string, handle ...any) {
+func (s *Router) OPTIONS(uri string, handle ...any) {
 	s.Any(http.MethodOptions, uri, handle...)
 }
 
-func (s *StdRouter) HEAD(uri string, handle ...any) {
+func (s *Router) HEAD(uri string, handle ...any) {
 	s.Any(http.MethodHead, uri, handle...)
 }
